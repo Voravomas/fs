@@ -1,8 +1,8 @@
-# Lab 2 Option 3: Adder
+# Lab 7 FAT-16
 
 ## Team
 
- - [Volodymyr Chernetskyi](https://github.com/chernetskyi)
+ - [Samovarov Mykyta](https://github.com/voravomas)
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Dependencies (such as development libraries) can be found in the [dependencies f
 
 1. Clone the project.
     ```bash
-    git clone git@github.com:chernetskyi/cpp-template.git
+    git clone git@github.com:voravomas/fs.git
     ```
 2. Install required packages.
 
@@ -37,9 +37,17 @@ Dependencies (such as development libraries) can be found in the [dependencies f
 ## Usage
 
 ```bash
-add [a] [b]
+fs fat16.img
+fs ../../a.img
 ```
 
-If less than two numbers provided, zeroes are used instead. If more - an error occurs.
+This program reads FAT-16 image.
+It reads characteristics of filesystem,
+and each entry file in root directory.
+
+Note: Please try it in wide opened terminal
+for better visual look.
+ 
+Lab is made without any additional tasks.
 
 Help flags `-h`/`--help` support is available.

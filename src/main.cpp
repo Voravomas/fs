@@ -1,44 +1,101 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
-// Remember to include ALL the necessary headers!
 #include <iostream>
 #include <boost/program_options.hpp>
+#include <fstream>
 
-// By convention, C++ header files use the `.hpp` extension. `.h` is OK too.
-#include "arithmetic/arithmetic.hpp"
+#include "../header/structs.h"
+#include "../header/helper.h"
+#include "../header/printer.h"
 
-int main(int argc, char **argv) {
-    int variable_a, variable_b;
 
-    namespace po = boost::program_options;
+namespace po = boost::program_options;
 
-    po::options_description visible("Supported options");
-    visible.add_options()
-            ("help,h", "Print this help message.");
+int main(int ac, char *av[]) {
+    std::string img_path;
+    std::vector<std::string> str_files;
+    std::string desc_str = std::string("Description:\n\tThis program allows to read FAT-16 image info");
+    //configuring positional arguments
+    try{
+        po::options_description desc(desc_str);
+        desc.add_options()
+                ("help,h", "Produce help message")
+                ("input-file", po::value< std::vector<std::string> >(), "Enter path to image")
+                ;
 
-    po::options_description hidden("Hidden options");
-    hidden.add_options()
-            ("a", po::value<int>(&variable_a)->default_value(0), "Variable A.")
-            ("b", po::value<int>(&variable_b)->default_value(0), "Variable B.");
+        po::positional_options_description p;
+        p.add("input-file", -1);
 
-    po::positional_options_description p;
-    p.add("a", 1);
-    p.add("b", 1);
+        po::variables_map vm;
+        po::store(po::command_line_parser(ac, av).
+                options(desc).positional(p).run(), vm);
+        po::notify(vm);
 
-    po::options_description all("All options");
-    all.add(visible).add(hidden);
+        if (vm.count("help")) {
+            std::cout << desc << "\n";
+            return 0;
+        }
 
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(all).positional(p).run(), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-        std::cout << "Usage:\n  add [a] [b]\n" << visible << std::endl;
-        return EXIT_SUCCESS;
+        if (vm.count("input-file")){
+            str_files = vm["input-file"].as<std::vector<std::string> >();
+        }
+    }
+    catch (std::exception& e) {
+        std::string tempStr = std::string("Error: ") + e.what();
+        perror(tempStr.c_str());
+        return 1;
     }
 
-    int result = arithmetic::add(variable_a, variable_b);
-    std::cout << result << std::endl;
-    return EXIT_SUCCESS;
+    // error handling for user's argv
+    if (str_files.empty()){
+        std::cerr << "Error: No Image path included!" << std::endl;
+        exit(1);
+    } else if (str_files.size() == 1){
+        img_path = str_files[0];
+        if (!ends_with(img_path, ".img")){
+            std::cerr <<"Error: Path should ends with '.img'" << std::endl;
+            exit(1);
+        }
+    } else if (str_files.size() > 1){
+        std::cerr <<"Error: Only one argument is allowed!" << std::endl;
+        exit(1);
+    }
+
+    //read image and fill structure
+    Fat16BootSector bs{};
+    std::fstream in;
+    in.open(img_path, std::fstream::in | std::fstream::binary);
+    if (in.fail()){
+        std::cerr << "Error: Unable to open file" << std::endl;
+        exit(1);
+    }
+
+    in.read((char*)&bs, sizeof(Fat16BootSector));
+    if (!in.is_open()){
+        std::cerr << "Error: Unable to read file" << std::endl;
+        in.close();
+        exit(1);
+    }
+
+
+    //calculating name of image
+    int temp_idx = (img_path.rfind('/') != -1) ? static_cast<int>(img_path.rfind('/') + 1) : 0;
+    std::string img_name = img_path.substr(temp_idx, img_path.size());
+
+    //print main info
+    printer_img_char(&img_name, &bs);
+
+
+    //calculating offset, number of dir entries and doing offset
+    int offset = (bs.reserved_sectors + bs.fat_size_sectors * static_cast<unsigned short>(bs.number_of_fats))
+            * bs.sector_size;
+    in.seekg(offset);
+
+    //printing meta info
+    printer_meta_info(&bs, &in);
+
+    in.close();
+    if (in.fail()){
+        std::cerr << "Error: Unable to close file" << std::endl;
+        exit(1);
+    }
+    return 0;
 }
